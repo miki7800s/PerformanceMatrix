@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
-import { Download, ImageDown } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Download, ImageDown, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   CartesianGrid,
@@ -112,6 +112,42 @@ export function MatrixPage() {
   const xTarget = settings.thresholds.good
   const xMax = Math.max(...points.map((p) => p.x), xTarget + 10)
   const xMin = Math.min(...points.map((p) => p.x), 70)
+
+  const fullXDomain: [number, number] = [
+    Math.floor(xMin / 10) * 10,
+    Math.ceil(xMax / 10) * 10,
+  ]
+  const fullYDomain: [number, number] = [3, 5]
+
+  const [zoomLevel, setZoomLevel] = useState(0)
+  const MAX_ZOOM_LEVEL = 6
+  const ZOOM_FACTOR = 0.65
+
+  useEffect(() => {
+    setZoomLevel(0)
+  }, [manager, activePeriod])
+
+  const zoomedXDomain: [number, number] =
+    zoomLevel === 0
+      ? fullXDomain
+      : (() => {
+          const width =
+            (fullXDomain[1] - fullXDomain[0]) * ZOOM_FACTOR ** zoomLevel
+          return [xTarget - width / 2, xTarget + width / 2]
+        })()
+
+  const zoomedYDomain: [number, number] =
+    zoomLevel === 0
+      ? fullYDomain
+      : (() => {
+          const width =
+            (fullYDomain[1] - fullYDomain[0]) * ZOOM_FACTOR ** zoomLevel
+          return [CSAT_TARGET - width / 2, CSAT_TARGET + width / 2]
+        })()
+
+  const zoomIn = () => setZoomLevel((z) => Math.min(z + 1, MAX_ZOOM_LEVEL))
+  const zoomOut = () => setZoomLevel((z) => Math.max(z - 1, 0))
+  const resetZoom = () => setZoomLevel(0)
 
   if (loading) {
     return (
@@ -230,13 +266,57 @@ export function MatrixPage() {
           />
           Zobrazit jména
         </label>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={zoomOut}
+            disabled={zoomLevel === 0}
+            title="Oddálit"
+            aria-label="Oddálit"
+          >
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={zoomIn}
+            disabled={zoomLevel === MAX_ZOOM_LEVEL}
+            title="Přiblížit"
+            aria-label="Přiblížit"
+          >
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetZoom}
+            disabled={zoomLevel === 0}
+            title="Zrušit přiblížení"
+            aria-label="Zrušit přiblížení"
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            Ctrl + kolečko myši pro zoom
+          </span>
+        </div>
         <div className="ml-auto">
           <ToneLegend />
         </div>
       </div>
 
       <Card className="animate-fade-in-up">
-        <CardContent className="pt-6" ref={chartRef}>
+        <CardContent
+          className="pt-6"
+          ref={chartRef}
+          onWheel={(e) => {
+            if (!e.ctrlKey && !e.metaKey) return
+            e.preventDefault()
+            if (e.deltaY < 0) zoomIn()
+            else if (e.deltaY > 0) zoomOut()
+          }}
+        >
           <ResponsiveContainer width="100%" height={540}>
             <ScatterChart margin={{ top: 20, right: 28, bottom: 8, left: 0 }}>
               {/* quadrants */}
@@ -244,20 +324,33 @@ export function MatrixPage() {
                 x1={xTarget}
                 y1={CSAT_TARGET}
                 fill={colors.good}
-                fillOpacity={0.05}
+                fillOpacity={0.1}
+              />
+              <ReferenceArea
+                x2={xTarget}
+                y1={CSAT_TARGET}
+                fill={colors.series[3]}
+                fillOpacity={0.1}
+              />
+              <ReferenceArea
+                x1={xTarget}
+                y2={CSAT_TARGET}
+                fill={colors.serious}
+                fillOpacity={0.1}
               />
               <ReferenceArea
                 x2={xTarget}
                 y2={CSAT_TARGET}
                 fill={colors.critical}
-                fillOpacity={0.05}
+                fillOpacity={0.1}
               />
               <CartesianGrid stroke={colors.grid} />
               <XAxis
                 type="number"
                 dataKey="x"
                 name="Produktivita"
-                domain={[Math.floor(xMin / 10) * 10, Math.ceil(xMax / 10) * 10]}
+                domain={zoomedXDomain}
+                allowDataOverflow
                 tick={{ fill: colors.muted, fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: colors.axis }}
@@ -274,7 +367,8 @@ export function MatrixPage() {
                 type="number"
                 dataKey="y"
                 name="CSAT"
-                domain={[3, 5]}
+                domain={zoomedYDomain}
+                allowDataOverflow
                 tick={{ fill: colors.muted, fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
