@@ -351,6 +351,7 @@ export function MatrixPage() {
                 name="Produktivita"
                 domain={zoomedXDomain}
                 allowDataOverflow
+                tickFormatter={(v: number) => Math.round(v).toString()}
                 tick={{ fill: colors.muted, fontSize: 11 }}
                 tickLine={false}
                 axisLine={{ stroke: colors.axis }}
@@ -369,6 +370,7 @@ export function MatrixPage() {
                 name="CSAT"
                 domain={zoomedYDomain}
                 allowDataOverflow
+                tickFormatter={(v: number) => v.toFixed(zoomLevel > 0 ? 2 : 1)}
                 tick={{ fill: colors.muted, fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
