@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Download, ImageDown, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
+import { Download, ImageDown, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
+import type { CategoricalChartState } from 'recharts/types/chart/types'
 import {
   CartesianGrid,
   Cell,
@@ -119,35 +120,72 @@ export function MatrixPage() {
   ]
   const fullYDomain: [number, number] = [3, 5]
 
-  const [zoomLevel, setZoomLevel] = useState(0)
-  const MAX_ZOOM_LEVEL = 6
-  const ZOOM_FACTOR = 0.65
+  const [zoomDomain, setZoomDomain] = useState<{
+    x: [number, number]
+    y: [number, number]
+  } | null>(null)
+  const [drag, setDrag] = useState<{
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+  } | null>(null)
+  const dragOrigin = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
-    setZoomLevel(0)
+    setZoomDomain(null)
   }, [manager, activePeriod])
 
-  const zoomedXDomain: [number, number] =
-    zoomLevel === 0
-      ? fullXDomain
-      : (() => {
-          const width =
-            (fullXDomain[1] - fullXDomain[0]) * ZOOM_FACTOR ** zoomLevel
-          return [xTarget - width / 2, xTarget + width / 2]
-        })()
+  const zoomedXDomain = zoomDomain?.x ?? fullXDomain
+  const zoomedYDomain = zoomDomain?.y ?? fullYDomain
+  const isZoomed = zoomDomain !== null
 
-  const zoomedYDomain: [number, number] =
-    zoomLevel === 0
-      ? fullYDomain
-      : (() => {
-          const width =
-            (fullYDomain[1] - fullYDomain[0]) * ZOOM_FACTOR ** zoomLevel
-          return [CSAT_TARGET - width / 2, CSAT_TARGET + width / 2]
-        })()
+  const resetZoom = () => setZoomDomain(null)
 
-  const zoomIn = () => setZoomLevel((z) => Math.min(z + 1, MAX_ZOOM_LEVEL))
-  const zoomOut = () => setZoomLevel((z) => Math.max(z - 1, 0))
-  const resetZoom = () => setZoomLevel(0)
+  // Mousedown only records the origin in a ref (no re-render) so that a
+  // plain click on a point isn't turned into a state update — doing so
+  // mid-click can detach the symbol node before the browser's native
+  // click event fires on it, silently swallowing the click.
+  const handleMouseDown = (state: CategoricalChartState) => {
+    const x = state?.xValue
+    const y = state?.yValue
+    if (typeof x !== 'number' || typeof y !== 'number') return
+    dragOrigin.current = { x, y }
+  }
+
+  const handleMouseMove = (state: CategoricalChartState) => {
+    if (!dragOrigin.current) return
+    const x = state?.xValue
+    const y = state?.yValue
+    if (typeof x !== 'number' || typeof y !== 'number') return
+    const origin = dragOrigin.current
+    if (!drag) {
+      // Ignore tiny jitter so a normal click never starts a selection.
+      const dx = Math.abs(x - origin.x)
+      const dy = Math.abs(y - origin.y)
+      const minX = (zoomedXDomain[1] - zoomedXDomain[0]) * 0.01
+      const minY = (zoomedYDomain[1] - zoomedYDomain[0]) * 0.01
+      if (dx < minX && dy < minY) return
+    }
+    setDrag({ x1: origin.x, y1: origin.y, x2: x, y2: y })
+  }
+
+  const handleMouseUp = () => {
+    if (drag) {
+      const xSpan = Math.abs(drag.x2 - drag.x1)
+      const ySpan = Math.abs(drag.y2 - drag.y1)
+      const minXSpan = (zoomedXDomain[1] - zoomedXDomain[0]) * 0.03
+      const minYSpan = (zoomedYDomain[1] - zoomedYDomain[0]) * 0.03
+      if (xSpan > minXSpan && ySpan > minYSpan) {
+        setZoomDomain({
+          x: [Math.min(drag.x1, drag.x2), Math.max(drag.x1, drag.x2)],
+          y: [Math.min(drag.y1, drag.y2), Math.max(drag.y1, drag.y2)],
+        })
+      }
+    }
+    dragOrigin.current = null
+    setDrag(null)
+  }
 
   if (loading) {
     return (
@@ -266,39 +304,20 @@ export function MatrixPage() {
           />
           Zobrazit jména
         </label>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={zoomOut}
-            disabled={zoomLevel === 0}
-            title="Oddálit"
-            aria-label="Oddálit"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={zoomIn}
-            disabled={zoomLevel === MAX_ZOOM_LEVEL}
-            title="Přiblížit"
-            aria-label="Přiblížit"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={resetZoom}
-            disabled={zoomLevel === 0}
+            disabled={!isZoomed}
             title="Zrušit přiblížení"
             aria-label="Zrušit přiblížení"
           >
             <RotateCcw className="h-4 w-4" />
+            Zrušit přiblížení
           </Button>
           <span className="hidden text-xs text-muted-foreground sm:inline">
-            Ctrl + kolečko myši pro zoom
+            Tažením myší v grafu vyberte oblast k přiblížení
           </span>
         </div>
         <div className="ml-auto">
@@ -307,18 +326,15 @@ export function MatrixPage() {
       </div>
 
       <Card className="animate-fade-in-up">
-        <CardContent
-          className="pt-6"
-          ref={chartRef}
-          onWheel={(e) => {
-            if (!e.ctrlKey && !e.metaKey) return
-            e.preventDefault()
-            if (e.deltaY < 0) zoomIn()
-            else if (e.deltaY > 0) zoomOut()
-          }}
-        >
+        <CardContent className="pt-6" ref={chartRef}>
           <ResponsiveContainer width="100%" height={540}>
-            <ScatterChart margin={{ top: 20, right: 28, bottom: 8, left: 0 }}>
+            <ScatterChart
+              margin={{ top: 20, right: 28, bottom: 8, left: 0 }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              className="select-none [&_.recharts-surface]:cursor-crosshair"
+            >
               {/* quadrants */}
               <ReferenceArea
                 x1={xTarget}
@@ -370,7 +386,9 @@ export function MatrixPage() {
                 name="CSAT"
                 domain={zoomedYDomain}
                 allowDataOverflow
-                tickFormatter={(v: number) => v.toFixed(zoomLevel > 0 ? 2 : 1)}
+                tickFormatter={(v: number) =>
+                  v.toFixed(zoomedYDomain[1] - zoomedYDomain[0] < 1 ? 2 : 1)
+                }
                 tick={{ fill: colors.muted, fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
@@ -404,6 +422,17 @@ export function MatrixPage() {
                   fontSize: 11,
                 }}
               />
+              {drag && (
+                <ReferenceArea
+                  x1={drag.x1}
+                  x2={drag.x2}
+                  y1={drag.y1}
+                  y2={drag.y2}
+                  stroke={colors.axis}
+                  fill={colors.series[3]}
+                  fillOpacity={0.15}
+                />
+              )}
               <Tooltip
                 cursor={{ strokeDasharray: '4 4', stroke: colors.muted }}
                 content={({ payload }) => {
@@ -430,8 +459,9 @@ export function MatrixPage() {
               />
               <Scatter
                 data={points}
-                onClick={(payload) => {
-                  const point = payload as unknown as MatrixPoint
+                onClick={(entry) => {
+                  const point = (entry as unknown as { payload?: MatrixPoint })
+                    ?.payload
                   if (point?.name) openOperator(point.name)
                 }}
                 className="cursor-pointer"
