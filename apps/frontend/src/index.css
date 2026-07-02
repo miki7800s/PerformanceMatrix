@@ -1,0 +1,244 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Brand palette:
+ *   green  #5ED312 (primary)   purple #5C2483
+ *   slate  #344661             navy   #164194
+ *   azure  #0094E7
+ * Chart series use validated steps of the same hues (see chartTheme.ts).
+ */
+@layer base {
+  :root {
+    --brand-green: #5ed312;
+    --brand-purple: #5c2483;
+    --brand-slate: #344661;
+    --brand-navy: #164194;
+    --brand-azure: #0094e7;
+
+    --background: 100 25% 97%;
+    --foreground: 217 30% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 217 30% 15%;
+    --primary: 96 84% 45%;
+    --primary-foreground: 100 85% 8%;
+    --secondary: 214 25% 93%;
+    --secondary-foreground: 217 30% 22%;
+    --muted: 108 18% 93%;
+    --muted-foreground: 216 18% 42%;
+    --accent: 96 70% 92%;
+    --accent-foreground: 100 65% 18%;
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 20% 87%;
+    --input: 214 20% 80%;
+    --ring: 96 84% 40%;
+    --radius: 0.75rem;
+
+    /* Data-viz tokens — validated on surface #f8faf6 (all six checks PASS) */
+    --viz-series-1: #3fa30a; /* green   */
+    --viz-series-2: #8a4fbf; /* purple  */
+    --viz-series-3: #8a6a00; /* gold    */
+    --viz-series-4: #0094e7; /* azure   */
+    --viz-series-5: #2f66c4; /* royal   */
+    --viz-good: #2e7d00;
+    --viz-warning: #b57a00;
+    --viz-critical: #d03b3b;
+    --viz-grid: #e3e8de;
+    --viz-axis: #c2ccc0;
+    --viz-muted: #64748b;
+
+    --scene-opacity: 0.5;
+  }
+
+  .dark {
+    --background: 218 38% 8%;
+    --foreground: 210 30% 97%;
+    --card: 218 32% 12%;
+    --card-foreground: 210 30% 97%;
+    --primary: 96 84% 45%;
+    --primary-foreground: 100 85% 8%;
+    --secondary: 218 28% 17%;
+    --secondary-foreground: 210 25% 92%;
+    --muted: 218 26% 17%;
+    --muted-foreground: 214 18% 68%;
+    --accent: 96 45% 16%;
+    --accent-foreground: 96 75% 75%;
+    --destructive: 0 62% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 218 25% 20%;
+    --input: 218 25% 26%;
+    --ring: 96 84% 50%;
+
+    /* Same hues re-stepped for surface #141b26 (all six checks PASS) */
+    --viz-series-1: #46a80c;
+    --viz-series-2: #b06ac2;
+    --viz-series-3: #ad8a1e;
+    --viz-series-4: #0b8fd6;
+    --viz-series-5: #3b64c9;
+    --viz-good: #5ed312;
+    --viz-warning: #e0a92c;
+    --viz-critical: #f07575;
+    --viz-grid: #26303f;
+    --viz-axis: #334052;
+    --viz-muted: #8b98a9;
+
+    --scene-opacity: 0.18;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family:
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ---------- Animated background scene (uploaded SVG assets) ---------- */
+
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: var(--scene-opacity);
+}
+
+.scene img {
+  position: absolute;
+  user-select: none;
+}
+
+.scene-planet {
+  top: -140px;
+  right: -160px;
+  width: 520px;
+  animation: scene-drift 26s ease-in-out infinite;
+}
+
+.scene-astronaut {
+  bottom: 24%;
+  left: 26%;
+  width: 90px;
+  animation: scene-float 9s ease-in-out infinite;
+}
+
+.scene-trees {
+  bottom: -14px;
+  right: 8%;
+  width: 300px;
+  transform-origin: 50% 100%;
+  animation: scene-sway 12s ease-in-out infinite;
+}
+
+/* soft brand glows behind the content */
+.scene-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+}
+.scene-glow-green {
+  top: -120px;
+  left: -120px;
+  width: 420px;
+  height: 420px;
+  background: color-mix(in srgb, var(--brand-green) 32%, transparent);
+  animation: scene-pulse 14s ease-in-out infinite;
+}
+.scene-glow-purple {
+  bottom: -160px;
+  right: 20%;
+  width: 460px;
+  height: 460px;
+  background: color-mix(in srgb, var(--brand-purple) 26%, transparent);
+  animation: scene-pulse 18s ease-in-out infinite reverse;
+}
+.scene-glow-azure {
+  top: 30%;
+  right: -140px;
+  width: 380px;
+  height: 380px;
+  background: color-mix(in srgb, var(--brand-azure) 22%, transparent);
+  animation: scene-pulse 16s ease-in-out 4s infinite;
+}
+
+@keyframes scene-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg);
+  }
+  50% {
+    transform: translateY(-28px) rotate(7deg);
+  }
+}
+
+@keyframes scene-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate(-24px, 18px) rotate(3deg);
+  }
+}
+
+@keyframes scene-sway {
+  0%,
+  100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
+  }
+}
+
+@keyframes scene-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene img,
+  .scene-glow {
+    animation: none !important;
+  }
+}
+
+/* PDF export = browser print. Hide chrome, print only page content. */
+@media print {
+  aside,
+  .scene,
+  .no-print {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  .animate-fade-in-up {
+    animation: none !important;
+  }
+}
