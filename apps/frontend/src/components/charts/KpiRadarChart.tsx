@@ -26,8 +26,15 @@ interface KpiRadarChartProps {
 }
 
 /**
+ * Radar values above this are visually clipped to the edge so a single
+ * outlier metric (e.g. bad data) can't collapse every other axis to zero.
+ * The tooltip still reports the real, unclipped value.
+ */
+const DOMAIN_CEILING = 200
+
+/**
  * Radar of percent KPIs. The radius domain adapts to the data so values
- * above 100 % stay inside the chart.
+ * above 100 % stay inside the chart, up to {@link DOMAIN_CEILING}.
  */
 export const KpiRadarChart = memo(function KpiRadarChart({
   data,
@@ -51,14 +58,26 @@ export const KpiRadarChart = memo(function KpiRadarChart({
       ? [d.value!, d.reference]
       : [d.value!],
   )
-  const max = Math.max(Math.ceil((Math.max(...allValues) + 5) / 10) * 10, 100)
+  const clippedMax = Math.min(Math.max(...allValues), DOMAIN_CEILING)
+  const max = Math.max(Math.ceil((clippedMax + 5) / 10) * 10, 100)
   const hasReference = points.some(
     (d) => d.reference !== null && d.reference !== undefined,
   )
 
+  const chartPoints = points.map((d) => ({
+    metric: d.metric,
+    value: d.value === null ? null : Math.min(d.value, max),
+    actualValue: d.value,
+    reference:
+      d.reference === null || d.reference === undefined
+        ? d.reference
+        : Math.min(d.reference, max),
+    actualReference: d.reference,
+  }))
+
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <RadarChart data={points} outerRadius="72%">
+      <RadarChart data={chartPoints} outerRadius="72%">
         <PolarGrid stroke={colors.grid} />
         <PolarAngleAxis
           dataKey="metric"
@@ -71,10 +90,13 @@ export const KpiRadarChart = memo(function KpiRadarChart({
         />
         <Tooltip
           contentStyle={tooltipStyle(colors)}
-          formatter={(value: number, name: string) => [
-            formatPercent(value),
-            name,
-          ]}
+          formatter={(value: number, name: string, item: { dataKey?: string | number; payload?: Record<string, number | null> }) => {
+            const actual =
+              item?.dataKey === 'reference'
+                ? item.payload?.actualReference
+                : item.payload?.actualValue
+            return [formatPercent(actual ?? value), name]
+          }}
         />
         {hasReference && referenceName && (
           <Radar
